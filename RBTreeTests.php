@@ -10,6 +10,8 @@ class RBTreeTests
 
         assert_options(ASSERT_WARNING, 0);
 
+        echo $tree->root->data . "\n";
+
         assert($tree->root->data == 4, RuntimeException::class);
     }
 }

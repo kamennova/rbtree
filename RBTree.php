@@ -80,6 +80,9 @@ class RBNode
 
     function rotate($dir_enum)
     {
+        global $rotate_num;
+        $rotate_num++;
+
         $dir = Directions::get_dir_str($dir_enum);
         $opposite = Directions::get_dir_str(Directions::get_opposite($dir_enum));
 
@@ -161,6 +164,7 @@ class RBTree
     function build_up($data_arr)
     {
         foreach ($data_arr as $data) {
+            echo $data." ";
             $this->insert($data);
         }
     }
@@ -233,19 +237,32 @@ class RBTree
     {
         echo "Delete: " . $data . "\n";
         if ($node = $this->find($data)) {
-            $this->delete_one_child($node);
+            $this->delete_node($node);
+
+            echo "Root: " . $this->root->data . "\n";
+            $this->infix();
             return true;
         }
 
+        echo "Node not found \n";
         return false;
     }
 
     function replace_node($node, $child)
     {
+        $node->data = $child->data;
+
+//        if($node)
+
+//        $node->
+
         if (!$this->is_leaf($child))
             $child->parent = $node->parent;
 
-        if ($node->parent == null) return;
+        if ($node->parent == null) {
+            $this->root = $child;
+            return;
+        }
 
         if ($this->is_left_child($node))
             $node->parent->left = $child;
@@ -253,29 +270,96 @@ class RBTree
             $node->parent->right = $child;
     }
 
-    function find_child_to_replace($node){
+    function find_child_to_replace($node)
+    {
 
-        if($this->is_leaf($node)) return null;
+        if ($this->is_leaf($node)) return null;
 
-        if($node->left){
+        if ($node->left) {
             $child = $node->left;
-            while(!$this->is_leaf($child->right)){
+            while (!$this->is_leaf($child->right)) {
                 $child = $child->right;
             }
         } else {
-            $child = $node->right;
-            while(!$this->is_leaf($child->left)){
-                $child = $child->left;
-            }
+            $child = $this->maximum_node($node->right);
         }
 
         return $child;
     }
 
+    function maximum_node($node)
+    {
+        $curr = $node;
+        $max = $curr;
+        while (!$this->is_leaf($curr->right)) {
+            $max = $node->right;
+            $curr = $curr->right;
+        }
+
+        return $max;
+    }
+
+    function delete_node($node)
+    {
+        if ($this->is_leaf($node->left) && $this->is_leaf($node->right)) {
+            $this->replace_node_with_new($node, null);
+            return;
+        }
+
+        if (!$this->is_leaf($node->left) && !$this->is_leaf($node->right)) {
+            $pred = $this->maximum_node($node->left);
+            $node->data = $pred->data;
+            $node = $pred;
+        }
+
+        $child = $this->is_leaf($node->right) ? $node->left : $node->right;
+        if ($this->get_color($node) == Colours::black) {
+            $node->color = $this->get_color($child);
+            $this->delete_case1($node);
+        }
+
+        $this->replace_node_with_new($node, $child);
+        $node = null;
+    }
+
+    function replace_node_with_new($old, $new)
+    {
+        if ($old->parent == NULL) {
+            $this->root = $new;
+        } else {
+            if ($this->is_left_child($old))
+                $old->parent->left = $new;
+            else
+                $old->parent->right = $new;
+        }
+
+        if (!$this->is_leaf($new)) {
+            $new->parent = $old->parent; // todo
+        }
+    }
+
     function delete_one_child($node)
     {
-        // Precondition: node has at most one non-leaf child.
-//        $child = $this->is_leaf($node->right) ? $node->left : $node->right;
+        /*if (n->left != NULL && n->right != NULL)
+    {
+        node pred = maximum_node(n->left);
+        n->key   = pred->key;
+        n->value = pred->value;
+        n = pred;
+    }
+
+    assert(n->left == NULL || n->right == NULL);
+    child = n->right == NULL ? n->left  : n->right;
+    if (node_color(n) == BLACK)
+    {
+        n->color = node_color(child);
+        delete_case1(t, n);
+    }
+
+
+    replace_node(t, n, child);
+    free(n);
+    verify_properties(t); */
 
         $child = $this->find_child_to_replace($node);
         $this->replace_node($node, $child);
@@ -284,14 +368,15 @@ class RBTree
             echo "Child: " . $child->data . " \n";
 
             if ($node->color == Colours::black) {
-                if ($child->color == Colours::red)
-                    $child->color = Colours::black;
-                else
-                    $this->delete_case1($child);
+//                if ($node->color == $child->color)
+//                    $child->color = Colours::black;
+//                else
+                $node->color = $child->color;
+                $this->delete_case1($child);
             }
         }
 
-        $node = null; // todo
+        $child = null; // todo
     }
 
     function delete_case1($node)
@@ -320,8 +405,10 @@ class RBTree
     {
         $sib = $node->get_sibling();
 
-        if ($this->get_color($node->parent) == Colours::black && $this->get_color($sib) == Colours::black &&
-            $this->get_color($sib->left) == Colours::black && $this->get_color($sib->right) == Colours::black) {
+        if ($this->get_color($node->parent) == Colours::black &&
+            $this->get_color($sib) == Colours::black &&
+            $this->get_color($sib->left) == Colours::black &&
+            $this->get_color($sib->right) == Colours::black) {
             $sib->color = Colours::red;// todo
             $this->delete_case1($node->parent);
         } else
@@ -347,12 +434,14 @@ class RBTree
         $sib = $node->get_sibling();
 
         if ($this->get_color($sib) == Colours::black) {
-            if ($this->is_left_child($node) && $this->get_color($sib->right) == Colours::black &&
+            if ($this->is_left_child($node) &&
+                $this->get_color($sib->right) == Colours::black &&
                 $this->get_color($sib->left) == Colours::red) { /* this last test is trivial too due to cases 2-4. */
                 $sib->color = Colours::red;
                 $sib->left->color = Colours::black;
                 $sib->rotate(Directions::right);
-            } else if ($this->is_right_child($node) && $this->get_color($sib->left) == Colours::black &&
+            } else if ($this->is_right_child($node) &&
+                $this->get_color($sib->left) == Colours::black &&
                 $this->get_color($sib->right) == Colours::red) {/* this last test is trivial too due to cases 2-4. */
                 $sib->color = Colours::red;
                 $sib->right->color = Colours::black;
@@ -412,4 +501,32 @@ class RBTree
             return $this->find_step($curr_node->left, $data);
         } else return $curr_node; // data = current node data => found
     }
+}
+
+function unordered_arr($num, $min = 0, $max = 20)
+{
+    $arr = [];
+    for ($i = 0; $i < $num; $i++) {
+        $arr [] = rand($min, $max);
+    }
+
+    return $arr;
+}
+
+function experiment()
+{
+    global $rotate_num;
+    $rotate_num = 0;
+
+    $exp_tree = new RBTree();
+    $exp_data = unordered_arr(10, 0, 40);
+    $exp_tree->build_up($exp_data);
+
+    $rotate_num = 0;
+
+    for ($i = 0; $i < 100000; $i++) {
+        $exp_tree->delete($exp_tree->root->data);
+    }
+
+    echo "Rotations: " . $rotate_num . "\n";
 }
